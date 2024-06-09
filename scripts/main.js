@@ -165,10 +165,7 @@ function calcB1toB0(input) {
 
   let dataLength = 1 + 1 + 2 * buckets.length + data.length / 2; // Number of bytes in numBuckets + numRepeats + buckets + data
 
-  let B0 = [dataLength, numRepeats, buckets, data];
-  // console.log(B0);
-
-  return B0;
+  return [dataLength, numRepeats, buckets, data];
 }
 
 function calcB0toRC(input) {
@@ -225,9 +222,11 @@ function calcB0toRC(input) {
   let timingMultiples = buckets.map((x) => x / greatestDivisor);
 
   let timingData = [greatestDivisor];
+  let syncMultiples = [];
   for (let i = 0; i < syncIndices.length; i += 2) {
-    timingData.push([timingMultiples[syncIndices[i]], timingMultiples[syncIndices[i + 1]]]);
+    syncMultiples.push([timingMultiples[syncIndices[i]], timingMultiples[syncIndices[i + 1]]]);
   }
+  timingData.push(syncMultiples);
   timingData.push([timingMultiples[bit1Mask[1]], timingMultiples[bit1Mask[0]]]);
   timingData.push([timingMultiples[bit1Mask[0]], timingMultiples[bit1Mask[1]]]);
 
@@ -242,6 +241,40 @@ function calcB0toRC(input) {
 
 function calcRCtoB0(input) {
   if (!Array.isArray(input) || input.length !== 2) return null;
+  
+  let timingData = input[0];
+  let code = input[1];
+  
+  let timingDivisor = timingData[0];
+  let syncMultiples = timingData[1].flat();
+  let bit1Multiples = timingData[3];
+  
+  let timingMultiplesUnique = [...new Set(timingData.slice(1).flat(2))];
+  let timingBuckets = timingMultiplesUnique.map((x) => x *timingDivisor);
+  
+  let syncIndices = syncMultiples.map((x) => timingMultiplesUnique.indexOf(x));
+  let bit1Indices = bit1Multiples.map((x) => timingMultiplesUnique.indexOf(x));
+  let bitIndices = [bit1Indices.toReversed(), bit1Indices];
+  
+  let codeIndices = [];
+  for (let i = 0; i < code.length; i++) {
+  	codeIndices = codeIndices.concat(bitIndices[code[i]]);
+  }
+  
+  let dataIndices = syncIndices.concat(codeIndices);
+  
+  let data = "";
+  for (let i = 0; i < dataIndices.length; i++) {
+  	let dataByte = (((i+1)%2) << 3) + dataIndices[i];
+    data += dataByte.toString(16);
+  }
+  
+  let dataLength = 1 + 1 + 2 * timingBuckets.length + data.length / 2; // Number of bytes in numBuckets + numRepeats + buckets + data
+  
+  let numRepeatsSetting = 8; // TODO: use setting
+  let numRepeats = numRepeatsSetting;
+  
+  return [dataLength, numRepeats, timingBuckets, data];
 }
 
 function calcRCtoAC123(input) {
@@ -282,6 +315,14 @@ function stringifyB0(input, spaces = true) {
   // console.log(B0);
 
   return B0.join(joinChar).toUpperCase();
+}
+
+function stringifyRC(input) {
+
+}
+
+function stringifyAC123(input) {
+
 }
 
 
