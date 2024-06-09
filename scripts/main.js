@@ -49,67 +49,67 @@ convertInput.addEventListener("input", (e) => {
 
 
 function parseB1(input) {
-  let inputArray = input.toUpperCase().split(" ");
-  // console.log(inputArray);
-  
-  if (inputArray.length < 6) return null;
-  if (inputArray[0] !== "AA") return null; // Sync init
-  if (inputArray[1] !== "B1") return null; // Command
-  if (inputArray[inputArray.length - 1] !== "55") return null; // Sync End
-  
-  let numBuckets = parseInt(inputArray[2], 16);
+  let inputClean = input.toUpperCase().replaceAll(" ", "");
+  // console.log(inputClean);
+
+  if (inputClean.length < 14) return null; // Shortest possible input
+  if (inputClean.substr(0, 4) !== "AAB1") return null; // Sync init & Command
+  if (inputClean.substr(-2, 2) !== "55") return null; // Sync End
+
+  let numBuckets = parseInt(inputClean.substr(4, 2), 16);
   if (Number.isNaN(numBuckets)) return null;
-  if (inputArray.length < (5 + numBuckets)) return null; // Length doesn't match number of buckets
-  
-  let bucketsHex = inputArray.slice(3, 3 + numBuckets);
+  if (inputClean.length < (10 + 4 * numBuckets)) return null; // Length doesn't match number of buckets
+
   let buckets = [];
-  for (let bucketHex of bucketsHex) {
-    let bucket = parseInt(bucketHex, 16);
+  for (let i = 0; i < numBuckets; i++) {
+    let bucket = parseInt(inputClean.substr(6 + 4 * i, 4), 16);
     if (Number.isNaN(bucket)) return null;
     buckets.push(bucket);
   }
-  
-  let code = inputArray[inputArray.length - 2];
+
+  let codeIndex = 6 + 4 * numBuckets;
+  let code = inputClean.substring(codeIndex, inputClean.length - 2);
   if (isNaN(parseInt(code, 16))) return null; // Is hex string?
-  
+
   return [buckets, code];
 }
 
 function parseB0(input) {
-  let inputArray = input.toUpperCase().split(" ");
-  if (inputArray.length < 8) return null;
-  if (inputArray[0] !== "AA") return null; // Sync init
-  if (inputArray[1] !== "B0") return null; // Command
-  if (inputArray[inputArray.length - 1] !== "55") return null; // Sync End
+  let inputClean = input.toUpperCase().replaceAll(" ", "");
+  // console.log(inputClean);
 
-  let dataLength = parseInt(inputArray[2], 16); // Length of the rest of just the data
+  if (inputClean.length < 18) return null; // Shortest possible input
+  if (inputClean.substr(0, 4) !== "AAB0") return null; // Sync init & Command
+  if (inputClean.substr(-2, 2) !== "55") return null; // Sync End
+
+  let dataLength = parseInt(inputClean.substr(4, 2), 16); // Length of the rest of just the data
   if (Number.isNaN(dataLength)) return null;
-  let calculatedLength = input.replaceAll(" ", "").length / 2 - 4;
+  let calculatedLength = inputClean.length / 2 - 4;
   if (dataLength !== calculatedLength) return null; // Length doesn't match specified length
 
-  let numBuckets = parseInt(inputArray[3], 16);
+  let numBuckets = parseInt(inputClean.substr(6, 2), 16);
   if (Number.isNaN(numBuckets)) return null;
-  if (inputArray.length < (7 + numBuckets)) return null; // Length doesn't match number of buckets
+  if (inputClean.length < (14 + 4 * numBuckets)) return null; // Length doesn't match number of buckets
 
-  let numRepeats = parseInt(inputArray[4], 16);
+  let numRepeats = parseInt(inputClean.substr(8, 2), 16);
   if (Number.isNaN(numRepeats) || numRepeats < 1) return null;
 
-  let bucketsHex = inputArray.slice(5, 5 + numBuckets);
   let buckets = [];
-  for (let bucketHex of bucketsHex) {
-    let bucket = parseInt(bucketHex, 16);
+  for (let i = 0; i < numBuckets; i++) {
+    let bucket = parseInt(inputClean.substr(10 + 4 * i, 4), 16);
     if (Number.isNaN(bucket)) return null;
     buckets.push(bucket);
   }
 
-  let code = inputArray[inputArray.length - 2];
+  let codeIndex = 10 + 4 * numBuckets;
+  let code = inputClean.substring(codeIndex, inputClean.length - 2);
   if (isNaN(parseInt(code, 16))) return null; // Is hex string?
 
   return [dataLength, numRepeats, buckets, code];
 }
 
 function parseRC(input) {
-  let inputSplit = input.match(/^{(.*?), ({.*})*, {(.*?)}, {(.*?)}}, (.*)$/);
+  let inputSplit = input.match(/^{(.*?), ?({.*})*, ?{(.*?)}, ?{(.*?)}}, ?(.*)$/);
   // console.log(inputSplit);
   if (inputSplit === null || inputSplit.length !== 6) return null;
   let code = inputSplit[5];
@@ -172,11 +172,78 @@ function calcB1toB0(input) {
 }
 
 function calcB0toRC(input) {
+  /*
+  	B0 format:
+    Each bit of the digital data is represented by a combination of a high then a low RF signal with different timings indicating either a 1 or a 0.
+    The protocol starts with a sync code of a few bits with unique timings to indicate the start.
+    The full thing is usually repeated multiple times.
+    	
+    The buckets store the unique timings between highs and lows in the RF signal for a protocol
+    
+  	Each bit of data is represented by 2 bytes of the code in B0, each of which is split into 2 parts:
+    	The leftmost bit is whether the signal should be high or low.
+    	The other 7 bits are an index into the bucket array for the time that signal is held.
+    
+    The protocol sync code can sometimes be read starting from the second (posibly third?) sync byte, meaning the first ends up at the end.
+    Maybe do full detection of this from: https://github.com/Portisch/RF-Bridge-EFM8BB1/blob/af1bddb3d81c79d67063184219ec21f8249dffd0/BitBucketConverter.py#L159
+  */
+  if (!Array.isArray(input) || input.length !== 4) return null;
 
+  let buckets = input[2];
+  let code = input[3];
+
+  let startHigh = parseInt(code[0], 16) >>> 3;
+  let bucketIndices = [];
+  for (let i = 0; i < code.length; i++) {
+    let codePiece = parseInt(code[i], 16);
+    // highLowArray.push(((codePiece & 8) > 0) ? 1 : 0);
+    bucketIndices.push(codePiece & 7);
+  }
+
+  let numSyncBitsSetting = 2; // Maybe become setting, not sure all the effects changing this has?
+  let numSyncIndices = numSyncBitsSetting * 2;
+
+  let syncIndices;
+  let codeIndices;
+  if (startHigh) {
+    syncIndices = bucketIndices.slice(0, numSyncIndices);
+    codeIndices = bucketIndices.slice(numSyncIndices);
+  } else {
+    syncIndices = bucketIndices.slice(0, numSyncIndices-1)
+    syncIndices.unshift(bucketIndices[bucketIndices.length - 1]);
+    codeIndices = bucketIndices.slice(numSyncIndices-1, -1);
+  }
+
+  let bit1Mask = codeIndices.slice(0, 2);
+  if (buckets[codeIndices[0]] < buckets[codeIndices[1]]) {
+    bit1Mask.reverse();
+  }
+
+  let customDivisorSetting = null; // Make into setting
+  let greatestDivisor = customDivisorSetting;
+  if (greatestDivisor === null) {
+    greatestDivisor = buckets.reduce(gcd);
+  }
+  let timingMultiples = buckets.map((x) => x / greatestDivisor);
+
+  let timingData = [greatestDivisor];
+  for (let i = 0; i < syncIndices.length; i += 2) {
+    timingData.push([timingMultiples[syncIndices[i]], timingMultiples[syncIndices[i + 1]]]);
+  }
+  timingData.push([timingMultiples[bit1Mask[1]], timingMultiples[bit1Mask[0]]]);
+  timingData.push([timingMultiples[bit1Mask[0]], timingMultiples[bit1Mask[1]]]);
+
+
+  let codeOut = "";
+  for (let i = 0; i < codeIndices.length; i += 2) {
+    codeOut += (codeIndices[i] === bit1Mask[0]) ? "1" : "0";
+  }
+
+  return [timingData, codeOut];
 }
 
 function calcRCtoB0(input) {
-
+  if (!Array.isArray(input) || input.length !== 2) return null;
 }
 
 function calcRCtoAC123(input) {
@@ -193,6 +260,13 @@ function calcRCtoAC123(input) {
 function stringifyB0(input, spaces = true) {
   if (!Array.isArray(input) || input.length !== 4) return null;
 
+  let joinChar;
+  if (spaces) {
+    joinChar = " ";
+  } else {
+    joinChar = "";
+  }
+
   let syncInit = "AA";
   let command = "B0";
   let dataLength = input[0].toString(16).padStart(2, "0");
@@ -200,12 +274,7 @@ function stringifyB0(input, spaces = true) {
   let numRepeats = input[1].toString(16).padStart(2, "0");
 
   let bucketsArray = input[2].map((x) => x.toString(16).padStart(4, "0"));
-  let buckets;
-  if (spaces) {
-    buckets = bucketsArray.join(" ");
-  } else {
-    buckets = bucketsArray.join("");
-  }
+  let buckets = bucketsArray.join(joinChar);
 
   let code = input[3];
 
@@ -214,9 +283,13 @@ function stringifyB0(input, spaces = true) {
   let B0 = [syncInit, command, dataLength, numBuckets, numRepeats, buckets, code, syncEnd];
   // console.log(B0);
 
-  if (spaces) {
-    return B0.join(" ").toUpperCase();
-  } else {
-    return B0.join("").toUpperCase();
+  return B0.join(joinChar).toUpperCase();
+}
+
+
+function gcd(a, b) {
+  if (b === 0) {
+    return a;
   }
+  return gcd(b, a % b);
 }
