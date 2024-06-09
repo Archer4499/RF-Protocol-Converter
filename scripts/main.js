@@ -67,11 +67,11 @@ function parseB1(input) {
     buckets.push(bucket);
   }
 
-  let codeIndex = 6 + 4 * numBuckets;
-  let code = inputClean.substring(codeIndex, inputClean.length - 2);
-  if (isNaN(parseInt(code, 16))) return null; // Is hex string?
+  let dataIndex = 6 + 4 * numBuckets;
+  let data = inputClean.substring(dataIndex, inputClean.length - 2);
+  if (isNaN(parseInt(data, 16))) return null; // Is hex string?
 
-  return [buckets, code];
+  return [buckets, data];
 }
 
 function parseB0(input) {
@@ -101,19 +101,19 @@ function parseB0(input) {
     buckets.push(bucket);
   }
 
-  let codeIndex = 10 + 4 * numBuckets;
-  let code = inputClean.substring(codeIndex, inputClean.length - 2);
-  if (isNaN(parseInt(code, 16))) return null; // Is hex string?
+  let dataIndex = 10 + 4 * numBuckets;
+  let data = inputClean.substring(dataIndex, inputClean.length - 2);
+  if (isNaN(parseInt(data, 16))) return null; // Is hex string?
 
-  return [dataLength, numRepeats, buckets, code];
+  return [dataLength, numRepeats, buckets, data];
 }
 
 function parseRC(input) {
   let inputSplit = input.match(/^{(.*?), ?({.*})*, ?{(.*?)}, ?{(.*?)}}, ?(.*)$/);
   // console.log(inputSplit);
   if (inputSplit === null || inputSplit.length !== 6) return null;
-  let code = inputSplit[5];
-  if (isNaN(parseInt(code, 2))) return null; // Is binary string?
+  let data = inputSplit[5];
+  if (isNaN(parseInt(data, 2))) return null; // Is binary string?
 
   let commonDivisor = parseInt(inputSplit[1]);
   if (Number.isNaN(commonDivisor) || commonDivisor < 1) return null;
@@ -149,7 +149,7 @@ function parseRC(input) {
 
   let timingData = [commonDivisor, syncBits, bit0, bit1];
 
-  return [timingData, code];
+  return [timingData, data];
 }
 
 
@@ -161,11 +161,11 @@ function calcB1toB0(input) {
 
   let buckets = input[0];
 
-  let code = input[1];
+  let data = input[1];
 
-  let dataLength = 1 + 1 + 2 * buckets.length + code.length / 2; // Number of bytes in numBuckets + numRepeats + buckets + code
+  let dataLength = 1 + 1 + 2 * buckets.length + data.length / 2; // Number of bytes in numBuckets + numRepeats + buckets + data
 
-  let B0 = [dataLength, numRepeats, buckets, code];
+  let B0 = [dataLength, numRepeats, buckets, data];
   // console.log(B0);
 
   return B0;
@@ -174,13 +174,13 @@ function calcB1toB0(input) {
 function calcB0toRC(input) {
   /*
   	B0 format:
-    Each bit of the digital data is represented by a combination of a high then a low RF signal with different timings indicating either a 1 or a 0.
+    Each bit of the code is represented by a combination of a high then a low RF signal with different timings indicating either a 1 or a 0.
     The protocol starts with a sync code of a few bits with unique timings to indicate the start.
     The full thing is usually repeated multiple times.
     	
     The buckets store the unique timings between highs and lows in the RF signal for a protocol
     
-  	Each bit of data is represented by 2 bytes of the code in B0, each of which is split into 2 parts:
+  	Each bit of code is represented by 2 bytes of the data in B0, each of which is split into 2 parts:
     	The leftmost bit is whether the signal should be high or low.
     	The other 7 bits are an index into the bucket array for the time that signal is held.
     
@@ -190,14 +190,12 @@ function calcB0toRC(input) {
   if (!Array.isArray(input) || input.length !== 4) return null;
 
   let buckets = input[2];
-  let code = input[3];
+  let data = input[3];
 
-  let startHigh = parseInt(code[0], 16) >>> 3;
+  let startHigh = parseInt(data[0], 16) >>> 3;
   let bucketIndices = [];
-  for (let i = 0; i < code.length; i++) {
-    let codePiece = parseInt(code[i], 16);
-    // highLowArray.push(((codePiece & 8) > 0) ? 1 : 0);
-    bucketIndices.push(codePiece & 7);
+  for (let i = 0; i < data.length; i++) {
+    bucketIndices.push(parseInt(data[i], 16) & 7);
   }
 
   let numSyncBitsSetting = 2; // Maybe become setting, not sure all the effects changing this has?
@@ -234,12 +232,12 @@ function calcB0toRC(input) {
   timingData.push([timingMultiples[bit1Mask[0]], timingMultiples[bit1Mask[1]]]);
 
 
-  let codeOut = "";
+  let code = "";
   for (let i = 0; i < codeIndices.length; i += 2) {
-    codeOut += (codeIndices[i] === bit1Mask[0]) ? "1" : "0";
+    code += (codeIndices[i] === bit1Mask[0]) ? "1" : "0";
   }
 
-  return [timingData, codeOut];
+  return [timingData, code];
 }
 
 function calcRCtoB0(input) {
@@ -248,10 +246,10 @@ function calcRCtoB0(input) {
 
 function calcRCtoAC123(input) {
   if (!Array.isArray(input) || input.length !== 2) return null;
-  let code = input[1]
-  if (code.length % 8 !== 0) return null;
-  if (code.length / 8 !== 8) return null;
-  let AC123 = code.match(/[01]{8}/g);
+  let data = input[1]
+  if (data.length % 8 !== 0) return null;
+  if (data.length / 8 !== 8) return null;
+  let AC123 = data.match(/[01]{8}/g);
   // console.log(AC123);
   return AC123;
 }
@@ -276,11 +274,11 @@ function stringifyB0(input, spaces = true) {
   let bucketsArray = input[2].map((x) => x.toString(16).padStart(4, "0"));
   let buckets = bucketsArray.join(joinChar);
 
-  let code = input[3];
+  let data = input[3];
 
   let syncEnd = "55";
 
-  let B0 = [syncInit, command, dataLength, numBuckets, numRepeats, buckets, code, syncEnd];
+  let B0 = [syncInit, command, dataLength, numBuckets, numRepeats, buckets, data, syncEnd];
   // console.log(B0);
 
   return B0.join(joinChar).toUpperCase();
