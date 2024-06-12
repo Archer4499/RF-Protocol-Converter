@@ -1,10 +1,47 @@
 const convertInput = document.getElementById("convert-input");
-const convertSettings = document.getElementById("convert-settings");
-const convertOutput = document.getElementById("convert-output");
+const convertInputFormat = document.getElementById("convert-input-format");
+const convertOutputs = document.getElementsByClassName("convert-output");
+const convertCopy = document.getElementsByClassName("convert-output-copy");
 
 
-convertInput.addEventListener("input", (e) => {
-  let input = e.target.value;
+const convertSettings      = document.getElementById("convert-settings");
+const convertSettingsReset = document.getElementById("convert-setting-reset");
+const spacesSetting        = document.getElementById("convert-setting-spaces");
+const numRepeatsSetting    = document.getElementById("convert-setting-repeats");
+const customDivisorSetting = document.getElementById("convert-setting-divisor"); // 0 is auto
+const numSyncBitsSetting   = document.getElementById("convert-setting-sync-bits"); // Not sure all the effects changing this has..
+
+// TODO: Store the user's input and settings for consistancy, but only at the end of dev for easier testing
+// TODO: Setup input tab order properly
+// TODO: Stringify functions
+// TODO: Advanced output, and split the AC123 into its components
+// TODO: probably use classes more for css to share style with the generators as well
+
+
+for (let i = 0; i < convertOutputs.length; i++) {
+	convertCopy[i].onclick = () => {
+  	if (convertOutputs[i].value !== "") {
+      convertOutputs[i].select();
+      document.execCommand("copy");
+    
+      // Visual feedback that task is completed
+      convertCopy[i].style.backgroundColor = "#b6c6e6";
+		} else {
+      convertCopy[i].style.backgroundColor = "#e6d6d6";
+    }
+    setTimeout(() => {
+      convertCopy[i].style.backgroundColor = "#e6e6e6";
+    }, 800);
+  };
+}
+
+
+convertInput.addEventListener("input", convert);
+convertSettings.addEventListener("input", convert);
+convertSettings.addEventListener("reset", () => (setTimeout(convert, 0)));
+
+function convert() {
+  let input = convertInput.value;
   console.log(input);
 
   let B1 = parseB1(input);
@@ -14,6 +51,7 @@ convertInput.addEventListener("input", (e) => {
 
   if (B1 !== null) {
     console.log("B1 Detected");
+    convertInputFormat.innerText = "Portisch B1";
     console.log(B1);
     B0 = calcB1toB0(B1);
     RC = calcB0toRC(B0);
@@ -21,31 +59,39 @@ convertInput.addEventListener("input", (e) => {
     B0 = parseB0(input);
     if (B0 !== null) {
       console.log("B0 Detected");
+    	convertInputFormat.innerText = "Portisch B0";
       console.log(B0);
       RC = calcB0toRC(B0);
     } else {
       RC = parseRC(input);
       if (RC !== null) {
         console.log("RC Detected");
+    		convertInputFormat.innerText = "RC-Switch";
         console.log(RC);
         B0 = calcRCtoB0(RC);
       } else {
         console.log("Unknown Detected");
-        convertOutput.innerText = "";
+    		convertInputFormat.innerText = "Unknown";
+				for (let i = 0; i < convertOutputs.length; i++) {
+        	convertOutputs[i].value = "";
+        }
         return;
       }
     }
   }
 
-  let spacesSetting = true; // TODO: use setting
   AC123 = calcRCtoAC123(RC);
   if (AC123 !== null) {
     console.log("Valid AC123 Detected");
-    convertOutput.innerText = stringifyB0(B0, spacesSetting) + RC + AC123;
+    convertOutputs[0].value = stringifyB0(B0, spacesSetting.checked);
+    convertOutputs[1].value = stringifyRC(RC, spacesSetting.checked);
+    convertOutputs[2].value = stringifyAC123(AC123, spacesSetting.checked);
   } else {
-    convertOutput.innerText = stringifyB0(B0, spacesSetting) + RC;
+    convertOutputs[0].value = stringifyB0(B0, spacesSetting.checked);
+    convertOutputs[1].value = stringifyRC(RC, spacesSetting.checked);
+    convertOutputs[2].value = "";
   }
-});
+}
 
 
 function parseB1(input) {
@@ -156,8 +202,7 @@ function parseRC(input) {
 function calcB1toB0(input) {
   if (!Array.isArray(input) || input.length !== 2) return null;
 
-  let numRepeatsSetting = 8; // TODO: use setting
-  let numRepeats = numRepeatsSetting;
+  let numRepeats = numRepeatsSetting.value;
 
   let buckets = input[0];
 
@@ -195,8 +240,7 @@ function calcB0toRC(input) {
     bucketIndices.push(parseInt(data[i], 16) & 7);
   }
 
-  let numSyncBitsSetting = 2; // Maybe become setting, not sure all the effects changing this has?
-  let numSyncIndices = numSyncBitsSetting * 2;
+  let numSyncIndices = numSyncBitsSetting.value * 2;
 
   let syncIndices;
   let codeIndices;
@@ -214,12 +258,11 @@ function calcB0toRC(input) {
     bit1Mask.reverse();
   }
 
-  let customDivisorSetting = null; // Make into setting
-  let greatestDivisor = customDivisorSetting;
-  if (greatestDivisor === null) {
+  let greatestDivisor = customDivisorSetting.value;
+  if (greatestDivisor === null || greatestDivisor < 1) {
     greatestDivisor = buckets.reduce(gcd);
   }
-  let timingMultiples = buckets.map((x) => x / greatestDivisor);
+  let timingMultiples = buckets.map((x) => Math.floor(x / greatestDivisor));
 
   let timingData = [greatestDivisor];
   let syncMultiples = [];
@@ -271,8 +314,7 @@ function calcRCtoB0(input) {
   
   let dataLength = 1 + 1 + 2 * timingBuckets.length + data.length / 2; // Number of bytes in numBuckets + numRepeats + buckets + data
   
-  let numRepeatsSetting = 8; // TODO: use setting
-  let numRepeats = numRepeatsSetting;
+  let numRepeats = numRepeatsSetting.value;
   
   return [dataLength, numRepeats, timingBuckets, data];
 }
@@ -317,12 +359,29 @@ function stringifyB0(input, spaces = true) {
   return B0.join(joinChar).toUpperCase();
 }
 
-function stringifyRC(input) {
+function stringifyRC(input, spaces = true) {
+  if (!Array.isArray(input) || input.length !== 2) return null;
 
+  let joinChar;
+  if (spaces) {
+    joinChar = ", ";
+  } else {
+    joinChar = ",";
+  }
+  
+	let timingData = input[0];
+  
+  timingData.splice(1, 1, ...timingData[1]);
+	for (let i = 1; i < timingData.length; i++) {
+  	timingData[i] = "{" + timingData[i].join(joinChar) + "}";
+  }
+  let timingString = "{" + timingData.join(joinChar) + "}";
+  
+	return timingString + joinChar + input[1];
 }
 
 function stringifyAC123(input) {
-
+	return input;
 }
 
 
@@ -331,4 +390,20 @@ function gcd(a, b) {
     return a;
   }
   return gcd(b, a % b);
+}
+
+
+// Collapsible section
+var coll = document.getElementsByClassName("collapsible");
+
+for (let i = 0; i < coll.length; i++) {
+  coll[i].addEventListener("click", function() {
+    this.classList.toggle("active");
+    var content = this.nextElementSibling;
+    if (content.style.maxHeight){
+      content.style.maxHeight = null;
+    } else {
+      content.style.maxHeight = content.scrollHeight + "px";
+    } 
+  });
 }
