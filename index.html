@@ -1,0 +1,107 @@
+<h3>RF Format Converter</h3>
+  <label for="convert-input">Input:</label>
+  <button class="collapsible">Settings</button>
+    <div class="collapsible-content">
+      <div class="collapsible-content-padding">
+        <form id="convert-settings">
+          <div class="checkbox-holder">
+            <input type="checkbox" id="convert-setting-spaces" value="">
+          </div>
+          <label for="convert-setting-spaces">Enable spaces in output?</label>
+          <br>
+          <input type="number" id="convert-setting-repeats" min="1" max="255" value="8">
+          <label for="convert-setting-repeats">Number of times code is set to repeat in B0</label>
+          <br>
+          <input type="number" id="convert-setting-divisor" min="0" max="9999" value="0">
+          <label for="convert-setting-divisor">Optional custom divisor for timings in RC-Switch (0=auto)</label>
+          <br>
+          <input type="number" id="convert-setting-sync-bits" min="1" max="99" value="2">
+          <label for="convert-setting-sync-bits">Number of sync bits in conversion to RC-Switch</label>
+          <br>
+          <input type="reset" id="convert-setting-reset" value="Reset to defaults">
+        </form>
+      </div>
+    </div>
+  <input type="text" id="convert-input" autocomplete="off" value="">
+  <br>
+  <p>
+    Detected the input as:
+    <span id="convert-input-format" style="display:inline;">Unknown</span>
+  </p>
+
+  <!-- <br> -->
+  <div>
+  <button class="collapsible">Example inputs</button>
+  <div class="collapsible-content">
+    <div class="collapsible-content-padding">
+      <p>
+      (spaces don't matter)<br>
+      Portisch B1 Sniffed Data: <br>
+      AA B1 04 1374 0276 0118 1388 38192A192A1A1A19292A1A19292929292A19292A1929292A1A192A192A1A19292A1A1A1A1A1A1A1A192A1A1A1A1A1A1A1A1A1A1A1A192A192929292A1A19292A1A19 55<br>
+      Portisch B0 Data: <br>
+      AA B0 4C 04 08 1374 0276 0118 1388 38192A192A1A1A19292A1A19292929292A19292A1929292A1A192A192A1A19292A1A1A1A1A1A1A1A192A1A1A1A1A1A1A1A1A1A1A1A192A192929292A1A19292A1A19 55<br>
+      RC-Switch Data: <br>
+      {10, {63, 500}, {498, 63}, {28, 63}, {63, 28}}, 1010001100111110110111001010011000000001000000000000101111001100
+      </p>
+    </div>
+  </div>
+  </div>
+
+  <h4>Output:</h4>
+    <label for="convert-output-b0">Portisch B0:</label>
+    <div class="convert-output-frame">
+      <input class="convert-output" id="convert-output-b0" readonly value="">
+      <button class="convert-output-copy" title="Copy">&#10697;</button>
+    </div>
+    <label for="convert-output-rc">RC-Switch:</label>
+    <div class="convert-output-frame">
+      <input class="convert-output" id="convert-output-rc" readonly value="">
+      <button class="convert-output-copy" title="Copy">&#10697;</button>
+    </div>
+    <br>
+
+    <button class="collapsible">Advanced Output</button>
+      <div class="collapsible-content">
+        <div class="collapsible-content-padding">
+          <div class="convert-output-frame">
+            <input class="convert-output" id="convert-output-adv" readonly value="">
+            <button class="convert-output-copy" title="Copy">&#10697;</button>
+          </div>
+          <div class="convert-output-frame">
+            <input class="convert-output" id="convert-output-adv2" readonly value="">
+            <button class="convert-output-copy" title="Copy">&#10697;</button>
+          </div>
+        </div>
+      </div>
+
+
+
+
+
+
+  
+  <!-- <label for="rc-switch">RC-Switch Data:</label>
+  <input tabindex="1" type="text" id="rc-switch" value=""><br>
+  <label for="ac123-protocol">AC123 Protocol Code:</label>
+  <input tabindex="2" type="text" id="ac123-protocol" value=""><br>
+  <label for="portisch">Sonoff Bridge Portisch:</label>
+  <input tabindex="3" type="text" id="portisch" value=""><br> -->
+
+<h3>A-OK AC123 Remote Code Generator</h3>
+  <form id="aok-gen">
+
+  </form>
+<h4>Settings</h4>
+  <form id="aok-gen-settings">
+
+  </form>
+<h3>Dooya DC2700 (And others) Remote Code Generator</h3>
+  <form id="dooya-gen">
+
+  </form>
+<h4>Settings</h4>
+  <form id="dooya-gen-settings">
+
+  </form>
+
+<script src="assets/scripts/main.js"></script>
